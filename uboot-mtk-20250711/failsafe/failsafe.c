@@ -15,7 +15,9 @@
 #include <net/mtk_tcp.h>
 #include <net/mtk_httpd.h>
 #include <net/mtk_dhcpd.h>
+#ifdef CONFIG_MTK_TELNETD
 #include <net/mtk_telnetd.h>
+#endif
 #include <u-boot/md5.h>
 #include <linux/stringify.h>
 #include <linux/string.h>
@@ -1012,9 +1014,6 @@ int start_web_failsafe(void)
 	failsafe_httpd_running = true;
 	net_loop(MTK_TCP);
 	failsafe_httpd_running = false;
-
-	if (IS_ENABLED(CONFIG_MTK_TELNETD))
-		mtk_telnetd_stop();
 
 	return 0;
 }

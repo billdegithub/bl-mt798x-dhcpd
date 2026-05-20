@@ -10,6 +10,8 @@
 #ifndef __NET_MTK_TELNETD_H__
 #define __NET_MTK_TELNETD_H__
 
+#include <stdbool.h>
+
 /**
  * mtk_telnetd_start() - Start the telnet server on a given port
  *
@@ -22,5 +24,6 @@ int mtk_telnetd_start(u16 port);
  * mtk_telnetd_stop() - Stop the telnet server
  */
 void mtk_telnetd_stop(void);
+bool mtk_telnetd_is_running(void);
 
 #endif /* __NET_MTK_TELNETD_H__ */

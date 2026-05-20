@@ -869,3 +869,55 @@ void mtk_telnetd_stop(void)
 
 	printf("Telnet server stopped\n");
 }
+
+bool mtk_telnetd_is_running(void)
+{
+	return telnetd_inst.running;
+}
+
+static int do_telnetd(struct cmd_tbl *cmdtp, int flag, int argc,
+		      char *const argv[])
+{
+	if (argc < 2)
+		return CMD_RET_USAGE;
+
+	if (!strcmp(argv[1], "start")) {
+		u16 port = 23;
+
+		if (argc > 2) {
+			unsigned long p;
+
+			p = simple_strtoul(argv[2], NULL, 10);
+			if (p >= 1 && p <= 65535)
+				port = (u16)p;
+		} else {
+			const char *env_port = env_get("telnet_port");
+
+			if (env_port) {
+				unsigned long p;
+
+				p = simple_strtoul(env_port, NULL, 10);
+				if (p >= 1 && p <= 65535)
+					port = (u16)p;
+			}
+		}
+
+		if (mtk_telnetd_start(port))
+			printf("Failed to start telnet server\n");
+
+		return CMD_RET_SUCCESS;
+	}
+
+	if (!strcmp(argv[1], "stop")) {
+		mtk_telnetd_stop();
+		return CMD_RET_SUCCESS;
+	}
+
+	return CMD_RET_USAGE;
+}
+
+U_BOOT_CMD(telnetd, 3, 0, do_telnetd,
+	"Control telnet server",
+	"start [port] - start telnet server (default port 23, or $telnet_port)\n"
+	"telnetd stop - stop telnet server"
+);
