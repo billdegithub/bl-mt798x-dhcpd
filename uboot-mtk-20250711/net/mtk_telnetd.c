@@ -26,7 +26,26 @@
 #include <vsprintf.h>
 #include <asm/global_data.h>
 
+#ifdef CONFIG_MTK_DHCPD
+#include <net/mtk_dhcpd.h>
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
+
+/**
+ * is_network_command() - check if a command will call net_loop()
+ *
+ * Returns true for commands that perform network I/O through net_loop(),
+ * which halts ethernet on completion.  The main poll loop needs to
+ * reinitialize ethernet afterwards.
+ */
+static bool is_network_command(const char *cmd)
+{
+	return strstr(cmd, "tftp") || strstr(cmd, "ping") ||
+	       strstr(cmd, "dhcp") || strstr(cmd, "bootp") ||
+	       strstr(cmd, "nfs")  || strstr(cmd, "rarp") ||
+	       strstr(cmd, "wget") || strstr(cmd, "tcp");
+}
 
 /* ------------------------------------------------------------------
  * Telnet protocol constants
@@ -86,6 +105,11 @@ struct telnetd_pdata {
 
 	char edit_outbuf[TELNETD_EDIT_BUF_SIZE];
 	u32 edit_outbuf_len;
+
+	bool executing;		/* true while run_command() is active –
+				 * prevents re-entrant telnetd_execute() calls
+				 * triggered by mtk_tcp_periodic_check()
+				 * running inside net_loop(). */
 };
 
 /* ------------------------------------------------------------------
@@ -388,8 +412,38 @@ static void telnetd_execute(struct mtk_tcp_cb_data *cbd,
 	/* Reset record so we only capture output from this command */
 	console_record_reset();
 
+	/* Detect network commands before running – they may halt ethernet */
+	bool was_network_cmd = is_network_command(cmd);
+
+	/*
+	 * Mark that we are executing a command.  This prevents re-entrant
+	 * telnetd_execute() calls that can happen when net_loop() runs
+	 * mtk_tcp_periodic_check() for all protocols (our non-blocking
+	 * failsafe modification).  Without this guard, the callback for
+	 * this same telnet connection could fire again and corrupt the
+	 * saved gd->console_out / membuf state.
+	 */
+	pdata->executing = true;
+
 	/* Run the U-Boot command */
 	run_command(cmd, 0);
+
+	pdata->executing = false;
+
+	/*
+	 * If a network command was executed, net_loop() inside it called
+	 * eth_halt() on completion.  We must reinitialize the ethernet
+	 * device RIGHT NOW so that mtk_tcp_send_data() can deliver the
+	 * captured output to the telnet client.  We also re-register the
+	 * DHCP handler that net_clear_handlers() removed.
+	 */
+	if (was_network_cmd) {
+		eth_init();
+#ifdef CONFIG_MTK_DHCPD
+		if (mtk_dhcpd_is_running())
+			mtk_dhcpd_start();
+#endif
+	}
 
 	/* Print a fresh prompt after the command's output */
 	if (prompt[0] != '\n')
@@ -783,7 +837,14 @@ static void telnetd_callback(struct mtk_tcp_cb_data *cbd)
 			cbd->datalen = 0; /* consumed */
 		}
 
-		if (pdata->state == TELNETD_S_IDLE)
+		/*
+		 * Skip processing if we are inside telnetd_execute() –
+		 * mtk_tcp_periodic_check() runs from within net_loop()
+		 * and could re-enter us while a command (e.g. tftpboot)
+		 * is still executing.  The buffered data will be picked
+		 * up when we return to IDLE after the command finishes.
+		 */
+		if (pdata->state == TELNETD_S_IDLE && !pdata->executing)
 			telnetd_process_input(cbd);
 		break;
 
@@ -816,8 +877,9 @@ static void telnetd_callback(struct mtk_tcp_cb_data *cbd)
 			/*
 			 * Process any buffered input that arrived while
 			 * we were busy sending the previous response.
+			 * Skip if we are re-entered from net_loop().
 			 */
-			if (pdata->inbuf_size > 0)
+			if (pdata->inbuf_size > 0 && !pdata->executing)
 				telnetd_process_input(cbd);
 		}
 		break;
