@@ -1,4 +1,24 @@
 #!/bin/bash
+# ============================================================================
+# generate_gpt.sh - Generate GPT (GUID Partition Table) binary files from
+#                   JSON partition layout descriptions for MT798x platforms
+#
+# Usage:
+#   [VERSION=2025|SP1|SP2] [SHOW=1] [DRAW=1|notitle] [SDMMC=1] ./generate_gpt.sh
+#
+# Modes:
+#   - Default:          Convert JSON partition layouts → GPT binary (.bin) files
+#                       Output: output_gpt/gpt-<name>-Yuzhii_md5-<hash>.bin
+#   - SHOW=1:           Display partition info from existing GPT bin/img files
+#                       Output: output_gpt/info/<name>_gptinfo.txt
+#   - DRAW=1:           Also generate partition layout PNG visualization
+#                       Output: output_gpt/picture/gpt-<name>.png
+#   - SDMMC=1:          Generate GPT binary for SD/MMC boot mode
+#
+# Dependencies:
+#   - python2.7 (required for GPT generation)
+#   - python3   (required for DRAW mode)
+# ============================================================================
 
 input_folder="./mt798x_gpt"
 input_folder_show="./mt798x_gpt_bin"

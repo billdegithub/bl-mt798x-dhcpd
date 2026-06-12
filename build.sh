@@ -1,4 +1,27 @@
 #!/bin/sh
+# ============================================================================
+# build.sh - Main build script for MediaTek MT798x platforms (ATF + U-Boot)
+#
+# Usage:
+#   BOARD=<board_name> [SOC=<mt7981|mt7986|mt7987|mt7988>] \
+#   [VERSION=2025|SP1|SP2] [VARIANT=default|ubootmod|ubi|nonmbm|openwrt] \
+#   [FSTHEME=bootstrap|gl|mtk] [FIXED_MTDPARTS=0|1] [MULTI_LAYOUT=0|1] \
+#   [SIMG=0|1] [UBIMNG=0|1] [TELNETD=0|1] [COPY_BL2=0|1] ./build.sh
+#
+# Examples:
+#   BOARD=cmcc_a10 ./build.sh
+#   BOARD=cmcc_a10 VARIANT=ubootmod ./build.sh
+#   BOARD=sn_r1 VERSION=2025 ./build.sh
+#   SOC=mt7981 BOARD=cmcc_a10 ./build.sh
+#   ./build.sh --clean           # Distclean all source directories
+#
+# This script:
+#   1. Auto-detects SOC from config files if not specified
+#   2. Checks build environment (npm, python3, cross-compiler)
+#   3. Builds U-Boot with selected variant and feature flags
+#   4. Builds ATF (ARM Trusted Firmware) with the built u-boot.bin as BL33
+#   5. Copies fip.bin (and optionally bl2.img) to output/ directory
+# ============================================================================
 
 AUTHOR="Yuzhii"
 
